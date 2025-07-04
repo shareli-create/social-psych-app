@@ -1,0 +1,5 @@
+{
+  "name": "Prof. Hareli's Real World Apprentice",
+  "description": "An application that finds recent news events and explains them using concepts from social psychology lectures. Select a lecture topic to see a real-world example analyzed by AI.",
+  "requestFramePermissions": []
+}
