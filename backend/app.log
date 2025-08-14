@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/app/backend/app.py", line 5, in <module>
+    import google_sheets
+  File "/app/backend/google_sheets.py", line 1, in <module>
+    import gspread
+ModuleNotFoundError: No module named 'gspread'
