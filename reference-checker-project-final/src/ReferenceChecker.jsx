@@ -9,7 +9,7 @@ const CITATION_PATTERNS = {
   // Possessive citations like "Averill's (1980)" or "Hatfield, Cacioppo, and Rapson's (1988)"
   possessive: /\b((?:[A-Z][a-z]+(?:,?\s*)?)+(?:and\s)?(?:[A-Z][a-z]+)?)(?:'s|’s)\s+\((\d{4}[a-z]?)\)/g,
   // Standard narrative citations
-  narrative: /\b([A-Z][a-z]+(?:'s)?(?:(?:\s*,\s*[A-Z][a-z]+)*\s+and\s+[A-Z][a-z]+|(?:\s+(?:et\s+al\.?|and\s+colleagues)))?(?:\s*[&,]\s*[A-Z][a-z]+)*)\s+\(([^)]+)\)/g,
+  narrative: /\b((?:[a-z]+\s)?[A-Z][a-z]+(?:'s)?(?:(?:\s*,\s*[A-Z][a-z]+)*\s+and\s+[A-Z][a-z]+|(?:\s+(?:et\s+al\.?,?|and\s+colleagues)))?(?:\s*[&,]\s*[A-Z][a-z]+)*)\s+\(([^)]+)\)/g,
   // Author-year patterns for parsing
   authorYear: [
     /([A-ZÀ-ÿa-z\-\']+(?:\s*[&,]\s*[A-ZÀ-ÿa-z\-\']+)*(?:\s+et\s+al\.?)?)\s*,?\s*(\d{4})/,
