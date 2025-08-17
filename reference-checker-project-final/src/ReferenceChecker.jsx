@@ -1,20 +1,21 @@
 import React, { useState, useCallback, useMemo, memo } from 'react';
 import { FileText, Upload, CheckCircle, AlertCircle, Download, Search, BookOpen, FileCheck, AlertTriangle, Info } from 'lucide-react';
+import './animations.css';
 
 // ==================== CONSTANTS ====================
 const CITATION_PATTERNS = {
   // More comprehensive parenthetical pattern
   parenthetical: /\([^)]*\b[A-ZÀ-ÿ][A-ZÀ-ÿa-z\-\']*(?:\s+et\s+al\.?)?.*?\d{4}[^)]*\)/g,
-  // Possessive citations like "Averill's (1980)"
-  possessive: /\b([A-Z][a-z]+)(?:'s|’s)\s+\((\d{4}[a-z]?)\)/g,
+  // Possessive citations like "Averill's (1980)" or "Hatfield, Cacioppo, and Rapson's (1988)"
+  possessive: /\b((?:[A-Z][a-z]+(?:,?\s*)?)+(?:and\s)?(?:[A-Z][a-z]+)?)(?:'s|’s)\s+\((\d{4}[a-z]?)\)/g,
   // Standard narrative citations
-  narrative: /\b([A-Z][a-z]+(?:'s)?(?:(?:\s*,\s*[A-Z][a-z]+)*\s+and\s+[A-Z][a-z]+|\s+et\s+al\.?)?(?:\s*[&,]\s*[A-Z][a-z]+)*)\s+\(([^)]+)\)/g,
+  narrative: /\b([A-Z][a-z]+(?:'s)?(?:(?:\s*,\s*[A-Z][a-z]+)*\s+and\s+[A-Z][a-z]+|(?:\s+(?:et\s+al\.?|and\s+colleagues)))?(?:\s*[&,]\s*[A-Z][a-z]+)*)\s+\(([^)]+)\)/g,
   // Author-year patterns for parsing
   authorYear: [
-    /^([A-ZÀ-ÿa-z\-\']+(?:\s*[&,]\s*[A-ZÀ-ÿa-z\-\']+)*(?:\s+et\s+al\.?)?)\s*,?\s*(\d{4})/,
-    /^([A-ZÀ-ÿa-z\-\']+\s+et\s+al\.?)\s*,?\s*(\d{4})/,
-    /^([A-ZÀ-ÿa-z\-\']+\s*&\s*[A-ZÀ-ÿa-z\-\']+)\s*,?\s*(\d{4})/,
-    /^([A-ZÀ-ÿa-z\-\']+)\s*,?\s*(\d{4})/
+    /([A-ZÀ-ÿa-z\-\']+(?:\s*[&,]\s*[A-ZÀ-ÿa-z\-\']+)*(?:\s+et\s+al\.?)?)\s*,?\s*(\d{4})/,
+    /([A-ZÀ-ÿa-z\-\']+\s+et\s+al\.?)\s*,?\s*(\d{4})/,
+    /([A-ZÀ-ÿa-z\-\']+\s*&\s*[A-ZÀ-ÿa-z\-\']+)\s*,?\s*(\d{4})/,
+    /([A-ZÀ-ÿa-z\-\']+)\s*,?\s*(\d{4})/
   ]
 };
 
@@ -29,7 +30,9 @@ const CONFIDENCE_THRESHOLDS = {
 // ==================== UTILITY FUNCTIONS ====================
 const normalize = (text) => {
   return text.toLowerCase()
-    .replace(/[.,&]/g, '')
+    .replace(/\s+and\s+/g, ' ')      // Normalize " and "
+    .replace(/[.,&]/g, '')          // Remove punctuation
+    .replace(/\s[a-z]\b\.?/g, '')   // Remove initials
     .replace(/\s+et\s+al\.?/g, '')
     .replace(/[-\s]+/g, ' ')
     .replace(/\s+/g, ' ')
@@ -1059,33 +1062,6 @@ const ReferenceChecker = () => {
   );
 };
 
-// Add CSS animations via style tag
-const style = document.createElement('style');
-style.textContent = `
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-
-  @keyframes slideIn {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .animate-fadeIn {
-    animation: fadeIn 0.5s ease-in-out;
-  }
-
-  .animate-slideIn {
-    animation: slideIn 0.5s ease-in-out;
-  }
-`;
-document.head.appendChild(style);
-
 export default ReferenceChecker;
+You are currently working on plan step: Improve the `normalize` function. I will update the function to better handle variations in author lists by stripping out initials and normalizing conjunctions like "and".. Once you have finished this, call `plan_step_complete()` before moving on to the next step.
+System Info: timestamp: 2025-08-17 01:07:53.308298
