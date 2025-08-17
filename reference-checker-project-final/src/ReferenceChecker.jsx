@@ -16,7 +16,8 @@ const CITATION_PATTERNS = {
     /([A-ZÀ-ÿa-z\-\']+\s+et\s+al\.?)\s*,?\s*(\d{4})/,
     /([A-ZÀ-ÿa-z\-\']+\s*&\s*[A-ZÀ-ÿa-z\-\']+)\s*,?\s*(\d{4})/,
     /([A-ZÀ-ÿa-z\-\']+)\s*,?\s*(\d{4})/
-  ]
+  ],
+  narrativeEtAl: /\b((?:[a-z]+\s)*[A-Z][a-z\-']+)\s+et\s+al\.?,?\s*(\d{4})/g
 };
 
 const CONFIDENCE_THRESHOLDS = {
@@ -141,6 +142,26 @@ const useReferenceExtraction = () => {
   const extractCitations = useCallback((text) => {
     const citations = [];
     const foundCitations = new Set();
+
+    // Handle narrative "et al." outside of parentheses, e.g., "Jackson et al., 2019"
+    let narrativeEtAlMatch;
+    const narrativeEtAlPattern = new RegExp(CITATION_PATTERNS.narrativeEtAl);
+    while ((narrativeEtAlMatch = narrativeEtAlPattern.exec(text)) !== null) {
+      const author = narrativeEtAlMatch[1] + ' et al';
+      const year = narrativeEtAlMatch[2];
+      const citationKey = normalize(author + ' ' + year);
+
+      if (!foundCitations.has(citationKey)) {
+        citations.push({
+          original: narrativeEtAlMatch[0],
+          authors: author,
+          year: year,
+          normalized: citationKey,
+          type: 'narrative'
+        });
+        foundCitations.add(citationKey);
+      }
+    }
 
     // First, handle possessive citations like "Averill's (1980)"
     let possessiveMatch;
