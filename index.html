@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Academic Reference Checker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+
+  <div id="app" class="max-w-6xl mx-auto">
+    <div class="text-center mb-8">
+      <div class="flex items-center justify-center mb-4">
+        <h1 class="text-4xl font-bold text-gray-800">Academic Reference Checker</h1>
+      </div>
+      <p class="text-lg text-gray-600">
+        Automatically verify citations and reference lists in academic documents
+      </p>
+    </div>
+
+    <div class="flex space-x-1 mb-6">
+      <button id="tab-input" class="px-6 py-3 rounded-lg font-medium transition-colors bg-indigo-600 text-white">
+        Document Input
+      </button>
+      <button id="tab-results" class="px-6 py-3 rounded-lg font-medium transition-colors bg-white text-gray-700 hover:bg-gray-50" disabled>
+        Analysis Results
+      </button>
+    </div>
+
+    <div id="content-input">
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Upload Document (optional)
+          </label>
+          <div class="flex items-center space-x-4">
+            <input type="file" id="file-upload" accept=".txt" class="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
+          </div>
+        </div>
+
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Document Text
+          </label>
+          <textarea id="document-text" placeholder="Paste your academic document here..." class="w-full h-96 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"></textarea>
+        </div>
+
+        <button id="process-button" class="w-full bg-indigo-600 text-white py-3 px-6 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2">
+          <span id="process-button-text">Analyze References</span>
+          <div id="process-button-loader" class="animate-spin rounded-full h-5 w-5 border-b-2 border-white" style="display: none;"></div>
+        </button>
+      </div>
+    </div>
+
+    <div id="content-results" style="display: none;" class="space-y-6">
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-2xl font-bold text-gray-800">Analysis Summary</h2>
+          <div class="flex items-center space-x-2">
+            <div id="export-status" class="px-3 py-1 bg-blue-50 text-blue-700 text-sm rounded-lg border border-blue-200" style="display: none;"></div>
+            <div class="flex space-x-2">
+              <button id="second-analysis-button" style="display: none;" class="flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 transition-colors">
+                <span id="second-analysis-button-text">Find More Matches</span>
+                <div id="second-analysis-loader" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white" style="display: none;"></div>
+              </button>
+              <button id="export-html-button" class="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
+                <span>Download HTML Report</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
+          <div class="bg-blue-50 p-4 rounded-lg text-center">
+            <div id="summary-total-citations" class="text-2xl font-bold text-blue-600">0</div>
+            <div class="text-sm text-gray-600">Total Citations</div>
+          </div>
+          <div class="bg-emerald-50 p-4 rounded-lg text-center">
+            <div id="summary-full-matches" class="text-2xl font-bold text-emerald-600">0</div>
+            <div class="text-sm text-gray-600">Full Matches</div>
+          </div>
+          <div class="bg-green-50 p-4 rounded-lg text-center">
+            <div id="summary-partial-matches" class="text-2xl font-bold text-green-600">0</div>
+            <div class="text-sm text-gray-600">Partial Matches</div>
+          </div>
+          <div class="bg-red-50 p-4 rounded-lg text-center">
+            <div id="summary-missing-refs" class="text-2xl font-bold text-red-600">0</div>
+            <div class="text-sm text-gray-600">Missing Refs</div>
+          </div>
+          <div class="bg-orange-50 p-4 rounded-lg text-center">
+            <div id="summary-unused-refs" class="text-2xl font-bold text-orange-600">0</div>
+            <div class="text-sm text-gray-600">Unused Refs</div>
+          </div>
+          <div class="bg-purple-50 p-4 rounded-lg text-center">
+            <div id="summary-match-rate" class="text-2xl font-bold text-purple-600">0%</div>
+            <div class="text-sm text-gray-600">Match Rate</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="second-analysis-container" style="display: none;" class="bg-white rounded-xl shadow-lg p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center">
+              <h3 id="second-analysis-title" class="text-xl font-bold text-gray-800">Potential Matches Found</h3>
+            </div>
+            <button id="update-results-button" style="display: none;" class="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
+              <span id="update-results-button-text">Update Results</span>
+            </button>
+          </div>
+          <div id="second-analysis-list" class="space-y-4"></div>
+      </div>
+
+      <div id="missing-refs-container" style="display: none;" class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center mb-4">
+          <h3 id="missing-refs-title" class="text-xl font-bold text-gray-800">Missing References</h3>
+        </div>
+        <div id="missing-refs-list" class="space-y-4"></div>
+      </div>
+
+      <div id="full-matches-container" style="display: none;" class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center mb-4">
+          <h3 id="full-matches-title" class="text-xl font-bold text-gray-800">Full Matches</h3>
+        </div>
+        <div id="full-matches-list" class="space-y-3"></div>
+      </div>
+
+      <div id="partial-matches-container" style="display: none;" class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center mb-4">
+          <h3 id="partial-matches-title" class="text-xl font-bold text-gray-800">Partial Matches</h3>
+        </div>
+        <div id="partial-matches-list" class="space-y-3"></div>
+      </div>
+
+      <div id="unused-refs-container" style="display: none;" class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center mb-4">
+          <h3 id="unused-refs-title" class="text-xl font-bold text-gray-800">Unused References</h3>
+        </div>
+        <div id="unused-refs-list" class="space-y-4"></div>
+      </div>
+    </div>
+
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
