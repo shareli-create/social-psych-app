@@ -454,6 +454,81 @@ const getConfidenceBadge = (confidence) => {
   return 'bg-red-100 text-red-800';
 };
 
+const extractTitleFromReference = (refString) => {
+    let match = refString.match(/"([^"]+)"/);
+    if (match && match[1]) return match[1];
+
+    match = refString.match(/\(\d{4}\)\.?\s+([^.]+)/);
+    if (match && match[1]) return match[1].replace(/\.$/, '').trim();
+
+    const yearMatch = refString.match(/\(\d{4}\)/);
+    if (yearMatch) {
+        const afterYear = refString.substring(yearMatch.index + 6);
+        return afterYear.split('.')[0].trim();
+    }
+
+    return '';
+}
+
+async function verifyReferenceOnline(item, type) {
+    let author = '';
+    let year = '';
+    let title = '';
+    let originalRef = '';
+
+    if (type === 'unused' || type === 'full' || type === 'partial') {
+        const ref = item.reference;
+        author = ref.firstAuthor.split(',')[0];
+        year = ref.year;
+        title = extractTitleFromReference(ref.original);
+        originalRef = ref.original;
+    } else if (type === 'missing') {
+        const cit = item.citation;
+        author = cit.authors.split(',')[0];
+        year = cit.year;
+        title = ''; // No reliable title
+        originalRef = cit.original;
+    }
+
+    if (!author || !year) {
+        return { status: 'Error', message: "Not enough info" };
+    }
+
+    const query = title ? `"${title}" ${author} ${year}` : `${originalRef}`;
+
+    try {
+        const searchResultsJson = await google_search(query);
+        const searchResults = JSON.parse(searchResultsJson || '[]');
+
+        if (!searchResults || searchResults.length === 0) {
+            return { status: 'NotFound' };
+        }
+
+        for (const result of searchResults.slice(0, 5)) {
+            const resultTitle = result.title || '';
+            const snippet = result.snippet || '';
+            const content = (resultTitle + ' ' + snippet).toLowerCase();
+
+            const titleSimilarity = title ? calculateSimilarity(normalize(title), normalize(resultTitle)) : 0;
+            const authorMatch = content.includes(author.toLowerCase());
+            const yearMatch = content.includes(year);
+
+            if (title && titleSimilarity > 0.85 && authorMatch && yearMatch) {
+                return { status: 'Verified', url: result.url };
+            }
+            if (!title && authorMatch && yearMatch) {
+                return { status: 'Verified', url: result.url };
+            }
+        }
+
+        return { status: 'NotFound' };
+
+    } catch (error) {
+        console.error("Search verification failed:", error);
+        return { status: 'Error', message: error.message };
+    }
+}
+
 const generateHtmlReport = (results) => {
   if (!results) return '';
 
@@ -573,6 +648,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const secondAnalysisButtonText = document.getElementById('second-analysis-button-text');
   const secondAnalysisLoader = document.getElementById('second-analysis-loader');
   const exportHtmlButton = document.getElementById('export-html-button');
+  const verifyAllButton = document.getElementById('verify-all-button');
   const summaryTotalCitations = document.getElementById('summary-total-citations');
   const summaryFullMatches = document.getElementById('summary-full-matches');
   const summaryPartialMatches = document.getElementById('summary-partial-matches');
@@ -620,6 +696,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderResults() {
     if (!results) return;
 
+    const verifyAllButton = document.getElementById('verify-all-button');
+    if (results.summary.totalCitations > 0) {
+        verifyAllButton.style.display = 'flex';
+    } else {
+        verifyAllButton.style.display = 'none';
+    }
+
     // Summary
     summaryTotalCitations.textContent = results.summary.totalCitations;
     summaryFullMatches.textContent = results.summary.fullMatches;
@@ -628,16 +711,30 @@ document.addEventListener('DOMContentLoaded', () => {
     summaryUnusedRefs.textContent = results.summary.unusedReferences;
     summaryMatchRate.textContent = results.summary.matchRate;
 
+    const renderItemHTML = (item, index, type, colorClass) => `
+      <div class="border border-${colorClass}-200 rounded-lg p-4 bg-${colorClass}-50">
+        <div class="flex items-start justify-between">
+          <div class="flex-1">
+            <div class="font-semibold text-${colorClass}-800">${type === 'unused' ? '' : 'Citation: '}${type === 'unused' ? item.reference.original : item.citation.original}</div>
+            ${type !== 'missing' && type !== 'unused' ? `<div class="text-sm text-gray-600 mt-1">Matches: ${item.reference.original}</div>` : ''}
+            ${type === 'missing' ? `<div class="text-sm text-gray-600 mb-2">Authors: ${item.citation.authors} | Year: ${item.citation.year}</div>` : ''}
+            <div id="verify-status-${type}-${index}" class="text-xs text-gray-500 mt-2 font-mono"></div>
+          </div>
+          <div class="flex flex-col items-end ml-4 flex-shrink-0">
+            ${type !== 'missing' && type !== 'unused' ? `<span class="px-2 py-1 rounded-full text-xs font-medium ${getConfidenceBadge(item.confidence)}">${item.confidence === 'User Confirmed' ? 'User Confirmed' : `${item.confidence}% confidence`}</span>` : ''}
+            <button data-item-index="${index}" data-item-type="${type}" class="verify-btn mt-2 px-3 py-1 bg-teal-500 text-white text-xs rounded hover:bg-teal-600 transition-colors">
+              Verify
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
     // Missing References
     if (results.missing.length > 0) {
       missingRefsContainer.style.display = 'block';
       missingRefsTitle.textContent = `Missing References (${results.missing.length})`;
-      missingRefsList.innerHTML = results.missing.map(item => `
-        <div class="border border-red-200 rounded-lg p-4 bg-red-50">
-          <div class="font-semibold text-red-800 mb-2">Citation: ${item.citation.original}</div>
-          <div class="text-sm text-gray-600 mb-2">Authors: ${item.citation.authors} | Year: ${item.citation.year}</div>
-        </div>
-      `).join('');
+      missingRefsList.innerHTML = results.missing.map((item, index) => renderItemHTML(item, index, 'missing', 'red')).join('');
     } else {
       missingRefsContainer.style.display = 'none';
     }
@@ -646,19 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (results.fullMatches.length > 0) {
       fullMatchesContainer.style.display = 'block';
       fullMatchesTitle.textContent = `Full Matches (${results.fullMatches.length})`;
-      fullMatchesList.innerHTML = results.fullMatches.map(item => `
-        <div class="border border-emerald-200 rounded-lg p-4 bg-emerald-50">
-          <div class="flex items-center justify-between">
-            <div class="flex-1">
-              <div class="font-semibold text-emerald-800">Citation: ${item.citation.original}</div>
-              <div class="text-sm text-gray-600 mt-1">Matches: ${item.reference.original}</div>
-            </div>
-            <span class="px-2 py-1 rounded-full text-xs font-medium ${getConfidenceBadge(item.confidence)}">
-              ${item.confidence === 'User Confirmed' ? 'User Confirmed' : `${item.confidence}% confidence`}
-            </span>
-          </div>
-        </div>
-      `).join('');
+      fullMatchesList.innerHTML = results.fullMatches.map((item, index) => renderItemHTML(item, index, 'full', 'emerald')).join('');
     } else {
       fullMatchesContainer.style.display = 'none';
     }
@@ -667,19 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (results.partialMatches.length > 0) {
       partialMatchesContainer.style.display = 'block';
       partialMatchesTitle.textContent = `Partial Matches (${results.partialMatches.length})`;
-      partialMatchesList.innerHTML = results.partialMatches.map(item => `
-        <div class="border border-green-200 rounded-lg p-4 bg-green-50">
-          <div class="flex items-center justify-between">
-            <div class="flex-1">
-              <div class="font-semibold text-green-800">Citation: ${item.citation.original}</div>
-              <div class="text-sm text-gray-600 mt-1">Matches: ${item.reference.original}</div>
-            </div>
-            <span class="px-2 py-1 rounded-full text-xs font-medium ${getConfidenceBadge(item.confidence)}">
-              ${item.confidence === 'User Confirmed' ? 'User Confirmed' : `${item.confidence}% confidence`}
-            </span>
-          </div>
-        </div>
-      `).join('');
+      partialMatchesList.innerHTML = results.partialMatches.map((item, index) => renderItemHTML(item, index, 'partial', 'green')).join('');
     } else {
       partialMatchesContainer.style.display = 'none';
     }
@@ -688,11 +761,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (results.unused.length > 0) {
       unusedRefsContainer.style.display = 'block';
       unusedRefsTitle.textContent = `Unused References (${results.unused.length})`;
-      unusedRefsList.innerHTML = results.unused.map(item => `
-        <div class="border border-orange-200 rounded-lg p-4 bg-orange-50">
-          <div class="font-semibold text-orange-800 mb-2">${item.reference.original}</div>
-        </div>
-      `).join('');
+      unusedRefsList.innerHTML = results.unused.map((item, index) => renderItemHTML(item, index, 'unused', 'orange')).join('');
       if (!secondAnalysis) {
         secondAnalysisButton.style.display = 'flex';
       }
@@ -903,11 +972,11 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       newPartialMatches.push(newMatch);
-      confirmedRefs.add(suggestion.reference.original);
+      confirmedRefs.add(suggestion.reference);
       if (bestIndex !== -1) matchedMissingIndices.add(bestIndex);
     });
 
-    const updatedUnused = results.unused.filter(u => !confirmedRefs.has(u.reference.original));
+    const updatedUnused = results.unused.filter(u => !confirmedRefs.has(u.reference));
     const updatedMissing = results.missing.filter((_, index) => !matchedMissingIndices.has(index));
 
     results.partialMatches.push(...newPartialMatches);
@@ -974,5 +1043,77 @@ document.addEventListener('DOMContentLoaded', () => {
       const candidateText = unescape(e.target.dataset.candidateText);
       markAsMatch(suggestionIndex, candidateText);
     }
+  });
+
+  // --- Verification Logic ---
+  async function handleVerify(itemType, itemIndex) {
+    const statusEl = document.getElementById(`verify-status-${itemType}-${itemIndex}`);
+    if (!statusEl) return;
+
+    statusEl.textContent = 'Verifying...';
+    statusEl.classList.remove('text-green-600', 'text-red-600');
+
+    let item;
+    switch (itemType) {
+        case 'full': item = results.fullMatches[itemIndex]; break;
+        case 'partial': item = results.partialMatches[itemIndex]; break;
+        case 'missing': item = results.missing[itemIndex]; break;
+        case 'unused': item = results.unused[itemIndex]; break;
+        default: return;
+    }
+
+    const result = await verifyReferenceOnline(item, itemType);
+
+    if (result.status === 'Verified') {
+        statusEl.innerHTML = `✔ Verified <a href="${result.url}" target="_blank" class="text-blue-500 hover:underline">[source]</a>`;
+        statusEl.classList.add('text-green-600');
+    } else if (result.status === 'NotFound') {
+        statusEl.textContent = '❌ Not Found';
+        statusEl.classList.add('text-red-600');
+    } else {
+        statusEl.textContent = `⚠️ Error: ${result.message || 'Unknown'}`;
+        statusEl.classList.add('text-red-600');
+    }
+  }
+
+  async function handleVerifyAll() {
+      verifyAllButton.disabled = true;
+      verifyAllButton.textContent = 'Verifying...';
+
+      const allItems = [
+          ...results.fullMatches.map((item, index) => ({ item, type: 'full', index })),
+          ...results.partialMatches.map((item, index) => ({ item, type: 'partial', index })),
+          ...results.missing.map((item, index) => ({ item, type: 'missing', index })),
+          ...results.unused.map((item, index) => ({ item, type: 'unused', index }))
+      ];
+
+      for (const { item, type, index } of allItems) {
+          const statusEl = document.getElementById(`verify-status-${type}-${index}`);
+          const buttonEl = document.querySelector(`button.verify-btn[data-item-type='${type}'][data-item-index='${index}']`);
+          if (statusEl && !statusEl.textContent.includes('✔')) {
+              await handleVerify(type, index);
+              if(buttonEl) {
+                buttonEl.disabled = true;
+                buttonEl.textContent = 'Checked';
+              }
+          }
+      }
+
+      verifyAllButton.disabled = false;
+      verifyAllButton.textContent = 'Verify All';
+  }
+
+  verifyAllButton.addEventListener('click', handleVerifyAll);
+
+  const resultsLists = [fullMatchesList, partialMatchesList, missingRefsList, unusedRefsList];
+  resultsLists.forEach(list => {
+      list.addEventListener('click', (e) => {
+          if (e.target.classList.contains('verify-btn')) {
+              const itemType = e.target.dataset.itemType;
+              const itemIndex = parseInt(e.target.dataset.itemIndex, 10);
+              e.target.disabled = true;
+              handleVerify(itemType, itemIndex);
+          }
+      });
   });
 });
